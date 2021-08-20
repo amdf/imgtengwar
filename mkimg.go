@@ -13,19 +13,39 @@ import (
 
 	"github.com/amdf/rustengwar"
 	"github.com/goki/freetype"
+	"github.com/goki/freetype/truetype"
 	"golang.org/x/image/font"
 )
 
 //TengwarImage handles img creation
 type TengwarImage struct {
-	Conv rustengwar.Converter
+	Conv  rustengwar.Converter
+	fonts map[string]*truetype.Font
 }
 
 //NewTengwarImage creates TengwarImage
 func NewTengwarImage() (ti *TengwarImage) {
 	ti = new(TengwarImage)
 	ti.Conv.InitDefault()
+	ti.InitFonts()
 	return
+}
+
+//InitFonts initalize fonts
+func (ti *TengwarImage) InitFonts() {
+	ti.fonts = make(map[string]*truetype.Font)
+	fontfiles := []string{"tngan.ttf", "tngani.ttf"}
+
+	for _, filename := range fontfiles {
+		// Read the font data.
+		fontBytes, err := ioutil.ReadFile(filename)
+		if err == nil {
+			f, err := freetype.ParseFont(fontBytes)
+			if err == nil {
+				ti.fonts[filename] = f
+			}
+		}
+	}
 }
 
 func (ti TengwarImage) getSingleParam(req *http.Request, key string) string {
@@ -37,24 +57,14 @@ func (ti TengwarImage) getSingleParam(req *http.Request, key string) string {
 	return keys[0]
 }
 
-func (ti TengwarImage) textToImage(text string, size float64, b io.Writer) {
+func (ti TengwarImage) textToImage(text string, size float64, b io.Writer) (err error) {
 	dpi := float64(72)
-	fontfile := "tngan.ttf"
+	fontfile := "tngani.ttf"
 	hinting := "none"
 	spacing := float64(1.5)
 	wonb := false
 
-	// Read the font data.
-	fontBytes, err := ioutil.ReadFile(fontfile)
-	if err != nil {
-		//log.Println(err)
-		return
-	}
-	f, err := freetype.ParseFont(fontBytes)
-	if err != nil {
-		//log.Println(err)
-		return
-	}
+	f := ti.fonts[fontfile]
 
 	// Initialize the context.
 	fg, bg := image.Black, image.White
@@ -101,7 +111,7 @@ func (ti TengwarImage) textToImage(text string, size float64, b io.Writer) {
 		//os.Exit(1)
 	}
 
-	//fmt.Println("Wrote out.png OK.")
+	return
 }
 
 //ConvertText shows converted text
@@ -115,12 +125,11 @@ func (ti *TengwarImage) ConvertText(w http.ResponseWriter, req *http.Request) {
 
 	text := ti.getSingleParam(req, "text")
 
-	//TODO: w.Header().Set("Content-Type", "")
 	s, _ := ti.Conv.Convert(text)
 	w.Write([]byte(s))
 }
 
-//ConvertImage shows images from converted text
+//ConvertImage shows image from converted text
 func (ti *TengwarImage) ConvertImage(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		http.Error(w, fmt.Sprintf("expect method GET /img/, got %v", req.Method), http.StatusMethodNotAllowed)
@@ -131,7 +140,6 @@ func (ti *TengwarImage) ConvertImage(w http.ResponseWriter, req *http.Request) {
 
 	text := ti.getSingleParam(req, "text")
 
-	//TODO: w.Header().Set("Content-Type", "")
 	s, _ := ti.Conv.Convert(text)
 	ti.textToImage(s, 72, w)
 }
