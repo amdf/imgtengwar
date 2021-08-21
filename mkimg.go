@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"image/draw"
 	"image/png"
 	"io"
@@ -15,6 +14,11 @@ import (
 	"github.com/goki/freetype"
 	"github.com/goki/freetype/truetype"
 	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
+)
+
+var (
+	fontfiles = []string{"tngan.ttf", "tngani.ttf"}
 )
 
 //TengwarImage handles img creation
@@ -34,7 +38,6 @@ func NewTengwarImage() (ti *TengwarImage) {
 //InitFonts initalize fonts
 func (ti *TengwarImage) InitFonts() {
 	ti.fonts = make(map[string]*truetype.Font)
-	fontfiles := []string{"tngan.ttf", "tngani.ttf"}
 
 	for _, filename := range fontfiles {
 		// Read the font data.
@@ -59,21 +62,21 @@ func (ti TengwarImage) getSingleParam(req *http.Request, key string) string {
 
 func (ti TengwarImage) textToImage(text string, size float64, b io.Writer) (err error) {
 	dpi := float64(72)
-	fontfile := "tngani.ttf"
+	fontfile := "tngan.ttf"
 	hinting := "none"
-	spacing := float64(1.5)
+	//spacing := float64(1.5)
 	wonb := false
 
 	f := ti.fonts[fontfile]
 
 	// Initialize the context.
 	fg, bg := image.Black, image.White
-	ruler := color.RGBA{0xdd, 0xdd, 0xdd, 0xff}
+	//ruler := color.RGBA{0xdd, 0xdd, 0xdd, 0xff}
 	if wonb {
 		fg, bg = image.White, image.Black
-		ruler = color.RGBA{0x22, 0x22, 0x22, 0xff}
+		//ruler = color.RGBA{0x22, 0x22, 0x22, 0xff}
 	}
-	rgba := image.NewRGBA(image.Rect(0, 0, 640, 480))
+	rgba := image.NewRGBA(image.Rect(0, 0, 1024, 768))
 	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)
 	c := freetype.NewContext()
 	c.SetDPI(dpi)
@@ -90,22 +93,36 @@ func (ti TengwarImage) textToImage(text string, size float64, b io.Writer) (err 
 	}
 
 	// Draw the guidelines.
-	for i := 0; i < 200; i++ {
+	/*for i := 0; i < 200; i++ {
 		rgba.Set(10, 10+i, ruler)
 		rgba.Set(10+i, 10, ruler)
-	}
+	}*/
 
 	// Draw the text.
-	pt := freetype.Pt(10, 10+int(c.PointToFixed(size)>>6))
+	ystart := 10 + int(c.PointToFixed(size)>>6)
+	fmt.Println("ystart: ", ystart)
+	pt := freetype.Pt(10, ystart)
 
-	_, err = c.DrawString(text, pt)
+	var drawPoint1 fixed.Point26_6
+	drawPoint1, err = c.DrawString(text, pt)
 	if err != nil {
 		//log.Println(err)
 		return
 	}
-	pt.Y += c.PointToFixed(size * spacing)
 
-	err = png.Encode(b, rgba)
+	fmt.Println("drawPoint 1 Y: ", drawPoint1.Y)
+	/*
+		TODO: add multiline support
+		pt.Y += c.PointToFixed(size * spacing)
+		drawPoint1, err = c.DrawString(text, pt)
+		fmt.Println("drawPoint 2 Y: ", drawPoint1.Y)
+	*/
+	err = png.Encode(b, rgba.SubImage(
+		image.Rectangle{
+			Min: image.Point{X: 0, Y: 0},
+			Max: image.Point{X: 10 + drawPoint1.X.Ceil(), Y: drawPoint1.Y.Ceil() + int(size)},
+		},
+	))
 	if err != nil {
 		//log.Println(err)
 		//os.Exit(1)
