@@ -8,7 +8,11 @@ import (
 
 func main() {
 	mux := http.NewServeMux()
-	ti := NewTengwarImage()
+	ti, err := NewTengwarImage()
+	if err != nil {
+		log.Fatal("init failed")
+	}
+
 	mux.HandleFunc("/text/", ti.ConvertText)
 	mux.HandleFunc("/img/", ti.ConvertImage)
 	port := os.Getenv("IMGTENGWAR_PORT")

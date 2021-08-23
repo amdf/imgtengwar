@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/amdf/rustengwar"
@@ -23,27 +25,35 @@ type TengwarImage struct {
 }
 
 //NewTengwarImage creates TengwarImage
-func NewTengwarImage() (ti *TengwarImage) {
+func NewTengwarImage() (ti *TengwarImage, err error) {
 	ti = new(TengwarImage)
-	ti.Conv.InitDefault()
-	ti.InitFonts()
+	err = ti.Conv.InitDefault()
+	if nil == err {
+		err = ti.InitFonts()
+	}
 	return
 }
 
 //InitFonts initalize fonts
-func (ti *TengwarImage) InitFonts() {
+func (ti *TengwarImage) InitFonts() (err error) {
 	ti.fonts = make(map[string]*truetype.Font)
 
 	for _, filename := range fontfiles {
 		// Read the font data.
-		fontBytes, err := ioutil.ReadFile(filename)
-		if err == nil {
-			f, err := freetype.ParseFont(fontBytes)
-			if err == nil {
+		fontBytes, errFile := ioutil.ReadFile(filename)
+		if errFile == nil {
+			f, errFont := freetype.ParseFont(fontBytes)
+			if errFont == nil {
 				ti.fonts[filename] = f
 			}
 		}
 	}
+
+	if 0 == len(ti.fonts) {
+		err = errors.New("no fonts")
+	}
+
+	return
 }
 
 func (ti TengwarImage) getSingleParam(req *http.Request, key string) string {
@@ -80,10 +90,21 @@ func (ti *TengwarImage) ConvertImage(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling ConvertImage at %s\n", req.URL.Path)
 
 	text := ti.getSingleParam(req, "text")
+	size := ti.getSingleParam(req, "size")
+
+	iSize, err := strconv.Atoi(size)
+
+	if err != nil || iSize <= 0 {
+		iSize = 36
+	}
 
 	s, _ := ti.Conv.Convert(text)
 
 	lines := strings.Split(s, "\n")
 
-	ti.textToImage(lines, 72, w)
+	err = ti.textToImage(lines, float64(iSize), w)
+
+	if err != nil {
+		http.Error(w, "ConvertImage error", http.StatusNoContent)
+	}
 }
