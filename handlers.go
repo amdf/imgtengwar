@@ -2,14 +2,13 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/amdf/rustengwar"
+	"github.com/gin-gonic/gin"
 	"github.com/goki/freetype"
 	"github.com/goki/freetype/truetype"
 )
@@ -35,8 +34,8 @@ func NewTengwarImageServer() (ti *TengwarImageServer, err error) {
 }
 
 //InitFonts initalize fonts
-func (ti *TengwarImageServer) InitFonts() (err error) {
-	ti.fonts = make(map[string]*truetype.Font)
+func (server *TengwarImageServer) InitFonts() (err error) {
+	server.fonts = make(map[string]*truetype.Font)
 
 	for _, filename := range fontfiles {
 		// Read the font data.
@@ -44,53 +43,31 @@ func (ti *TengwarImageServer) InitFonts() (err error) {
 		if errFile == nil {
 			f, errFont := freetype.ParseFont(fontBytes)
 			if errFont == nil {
-				ti.fonts[filename] = f
+				server.fonts[filename] = f
 			}
 		}
 	}
 
-	if 0 == len(ti.fonts) {
+	if 0 == len(server.fonts) {
 		err = errors.New("no fonts")
 	}
 
 	return
 }
 
-func (ti TengwarImageServer) getSingleParam(req *http.Request, key string) string {
-	keys, ok := req.URL.Query()[key]
+//ConvertText returns converted text
+func (server *TengwarImageServer) ConvertText(c *gin.Context) {
+	text := c.Query("text")
 
-	if !ok || len(keys[0]) < 1 {
-		return ""
-	}
-	return keys[0]
-}
+	s, _ := server.Conv.Convert(text)
 
-//ConvertText shows converted text
-func (ti *TengwarImageServer) ConvertText(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		http.Error(w, fmt.Sprintf("expect method GET /text/, got %v", req.Method), http.StatusMethodNotAllowed)
-		return
-	}
-
-	log.Printf("handling ConvertText at %s\n", req.URL.Path)
-
-	text := ti.getSingleParam(req, "text")
-
-	s, _ := ti.Conv.Convert(text)
-	w.Write([]byte(s))
+	c.String(http.StatusOK, "%s", s)
 }
 
 //ConvertImage shows image from converted text
-func (ti *TengwarImageServer) ConvertImage(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		http.Error(w, fmt.Sprintf("expect method GET /img/, got %v", req.Method), http.StatusMethodNotAllowed)
-		return
-	}
-
-	log.Printf("handling ConvertImage at %s\n", req.URL.Path)
-
-	text := ti.getSingleParam(req, "text")
-	size := ti.getSingleParam(req, "size")
+func (server *TengwarImageServer) ConvertImage(c *gin.Context) {
+	text := c.Query("text")
+	size := c.Query("size")
 
 	iSize, err := strconv.Atoi(size)
 
@@ -98,13 +75,13 @@ func (ti *TengwarImageServer) ConvertImage(w http.ResponseWriter, req *http.Requ
 		iSize = 36
 	}
 
-	s, _ := ti.Conv.Convert(text)
+	s, _ := server.Conv.Convert(text)
 
 	lines := strings.Split(s, "\n")
 
-	err = ti.textToImage(lines, float64(iSize), w)
+	err = server.textToImage(lines, "tngan.ttf", float64(iSize), c.Writer)
 
 	if err != nil {
-		http.Error(w, "ConvertImage error", http.StatusNoContent)
+		c.String(http.StatusNoContent, "ConvertImage error")
 	}
 }

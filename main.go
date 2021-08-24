@@ -2,20 +2,25 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	mux := http.NewServeMux()
-	ti, err := NewTengwarImage()
+
+	server, err := NewTengwarImageServer()
 	if err != nil {
 		log.Fatal("init failed")
 	}
 
-	mux.HandleFunc("/text/", ti.ConvertText)
-	mux.HandleFunc("/img/", ti.ConvertImage)
+	router := gin.Default()
+
+	router.GET("/text", server.ConvertText)
+	router.GET("/img", server.ConvertImage)
+
 	port := os.Getenv("IMGTENGWAR_PORT")
 	log.Print("Listen on port ", port)
-	log.Fatal(http.ListenAndServe("localhost:"+port, mux))
+
+	log.Fatal(router.Run("localhost:" + port))
 }
