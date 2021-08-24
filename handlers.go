@@ -18,15 +18,15 @@ var (
 	fontfiles = []string{"tngan.ttf", "tngani.ttf"}
 )
 
-//TengwarImage handles img creation
-type TengwarImage struct {
+//TengwarImageServer handles img creation
+type TengwarImageServer struct {
 	Conv  rustengwar.Converter
 	fonts map[string]*truetype.Font
 }
 
-//NewTengwarImage creates TengwarImage
-func NewTengwarImage() (ti *TengwarImage, err error) {
-	ti = new(TengwarImage)
+//NewTengwarImageServer creates TengwarImage
+func NewTengwarImageServer() (ti *TengwarImageServer, err error) {
+	ti = new(TengwarImageServer)
 	err = ti.Conv.InitDefault()
 	if nil == err {
 		err = ti.InitFonts()
@@ -35,7 +35,7 @@ func NewTengwarImage() (ti *TengwarImage, err error) {
 }
 
 //InitFonts initalize fonts
-func (ti *TengwarImage) InitFonts() (err error) {
+func (ti *TengwarImageServer) InitFonts() (err error) {
 	ti.fonts = make(map[string]*truetype.Font)
 
 	for _, filename := range fontfiles {
@@ -56,7 +56,7 @@ func (ti *TengwarImage) InitFonts() (err error) {
 	return
 }
 
-func (ti TengwarImage) getSingleParam(req *http.Request, key string) string {
+func (ti TengwarImageServer) getSingleParam(req *http.Request, key string) string {
 	keys, ok := req.URL.Query()[key]
 
 	if !ok || len(keys[0]) < 1 {
@@ -66,7 +66,7 @@ func (ti TengwarImage) getSingleParam(req *http.Request, key string) string {
 }
 
 //ConvertText shows converted text
-func (ti *TengwarImage) ConvertText(w http.ResponseWriter, req *http.Request) {
+func (ti *TengwarImageServer) ConvertText(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		http.Error(w, fmt.Sprintf("expect method GET /text/, got %v", req.Method), http.StatusMethodNotAllowed)
 		return
@@ -81,7 +81,7 @@ func (ti *TengwarImage) ConvertText(w http.ResponseWriter, req *http.Request) {
 }
 
 //ConvertImage shows image from converted text
-func (ti *TengwarImage) ConvertImage(w http.ResponseWriter, req *http.Request) {
+func (ti *TengwarImageServer) ConvertImage(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		http.Error(w, fmt.Sprintf("expect method GET /img/, got %v", req.Method), http.StatusMethodNotAllowed)
 		return

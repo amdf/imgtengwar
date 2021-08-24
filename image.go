@@ -18,12 +18,16 @@ const (
 	spacing = float64(1.5)
 )
 
-func (ti TengwarImage) textToImage(text []string, size float64, w io.Writer) (err error) {
+func (ti TengwarImageServer) textToImage(text []string, fontfile string, size float64, w io.Writer) (err error) {
 	dpi := float64(72)
-	fontfile := "tngan.ttf"
+
 	hinting := "none"
 
-	f := ti.fonts[fontfile]
+	f, ok := ti.fonts[fontfile]
+	if !ok {
+		err = errors.New("unknown font")
+		return
+	}
 
 	// Initialize the context.
 	fg, bg := image.White, image.Black
