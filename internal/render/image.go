@@ -1,4 +1,4 @@
-package main
+package render
 
 import (
 	"errors"
@@ -7,8 +7,10 @@ import (
 	"image/draw"
 	"image/png"
 	"io"
+	"io/ioutil"
 
 	"github.com/goki/freetype"
+	"github.com/goki/freetype/truetype"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
@@ -18,12 +20,40 @@ const (
 	spacing = float64(1.5)
 )
 
-func (ti TengwarImageServer) textToImage(text []string, fontfile string, size float64, w io.Writer) (err error) {
+var (
+	fonts     map[string]*truetype.Font
+	fontfiles = []string{"tngan.ttf", "tngani.ttf"}
+)
+
+//Init initalize fonts for rendering
+func Init() (err error) {
+	fonts = make(map[string]*truetype.Font)
+
+	for _, filename := range fontfiles {
+		// Read the font data.
+		fontBytes, errFile := ioutil.ReadFile(filename)
+		if errFile == nil {
+			f, errFont := freetype.ParseFont(fontBytes)
+			if errFont == nil {
+				fonts[filename] = f
+			}
+		}
+	}
+
+	if 0 == len(fonts) {
+		panic("no fonts")
+	}
+
+	return
+}
+
+//ToPNG converts lines of text to PNG image
+func ToPNG(text []string, fontfile string, size float64, w io.Writer) (err error) {
 	dpi := float64(72)
 
 	hinting := "none"
 
-	f, ok := ti.fonts[fontfile]
+	f, ok := fonts[fontfile]
 	if !ok {
 		err = errors.New("unknown font")
 		return

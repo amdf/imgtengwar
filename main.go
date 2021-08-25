@@ -4,15 +4,15 @@ import (
 	"log"
 	"os"
 
+	"github.com/amdf/imgtengwar/internal/render"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	render.Init()
 
-	server, err := NewTengwarImageServer()
-	if err != nil {
-		log.Fatal("init failed")
-	}
+	server := TengwarImageServer{}
+	server.Init()
 
 	router := gin.Default()
 
