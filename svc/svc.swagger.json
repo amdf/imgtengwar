@@ -137,7 +137,7 @@
     "imgtengwarConvertResponse": {
       "type": "object",
       "properties": {
-        "convertedText": {
+        "converted_text": {
           "type": "string"
         }
       }

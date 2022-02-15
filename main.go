@@ -8,6 +8,7 @@ import (
 
 	"github.com/amdf/imgtengwar/internal/render"
 	pb "github.com/amdf/imgtengwar/svc"
+	"github.com/amdf/rustengwar"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"golang.org/x/time/rate"
 	"google.golang.org/genproto/googleapis/api/httpbody"
@@ -27,11 +28,18 @@ const (
 type TengwarConverterServer struct {
 	pb.UnimplementedTengwarConverterServer
 	clientLimits map[string]*rate.Limiter
+	conv         rustengwar.Converter
 }
 
-func (srv TengwarConverterServer) ConvertText(context.Context, *pb.SimpleConvertRequest) (*pb.ConvertResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ConvertText not implemented")
+func (srv TengwarConverterServer) ConvertText(ctx context.Context, req *pb.SimpleConvertRequest) (resp *pb.ConvertResponse, err error) {
+	resp = &pb.ConvertResponse{}
+	resp.ConvertedText, err = srv.conv.Convert(req.InputText)
+	if err != nil {
+		err = status.Errorf(codes.Internal, err.Error())
+	}
+	return
 }
+
 func (srv TengwarConverterServer) MakeImage(context.Context, *pb.ConvertRequest) (*httpbody.HttpBody, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MakeImage not implemented")
 }
@@ -59,7 +67,7 @@ func (srv TengwarConverterServer) RateLimiter(ctx context.Context, info *tap.Inf
 	return ctx, nil
 }
 
-func runGateway() {
+func (srv TengwarConverterServer) RunGateway() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -84,6 +92,7 @@ func runGateway() {
 func MakeTengwarConverterServer() (srv *TengwarConverterServer, err error) {
 	srv = &TengwarConverterServer{}
 	srv.clientLimits = make(map[string]*rate.Limiter)
+	err = srv.conv.InitDefault()
 	return
 }
 
@@ -110,7 +119,7 @@ func main() {
 
 	log.Println("starting server at ", lis.Addr())
 
-	go runGateway()
+	go server.RunGateway()
 
 	err = s.Serve(lis)
 	if err != nil {

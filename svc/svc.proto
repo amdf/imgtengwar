@@ -26,7 +26,7 @@ message ConvertRequest {
 }
 
 message ConvertResponse {    
-    string converted_text = 1;
+    string converted_text = 1  [json_name="converted_text"];
 }
 
 service TengwarConverter {
