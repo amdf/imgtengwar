@@ -49,8 +49,16 @@ func (srv TengwarConverterServer) ConvertText(ctx context.Context, req *pb.Simpl
 func (srv TengwarConverterServer) MakeImage(ctx context.Context, req *pb.ConvertRequest) (body *httpbody.HttpBody, err error) {
 	var buf bytes.Buffer
 	t := time.Now()
-	defer func() { fmt.Println("2MakeImage ", req, time.Since(t)) }()
-	ss := strings.Split(req.InputText, "\r\n") //TODO: do smarter split
+	defer func() { fmt.Println("MakeImage", time.Since(t)) }()
+
+	var convText string
+	convText, err = srv.conv.Convert(req.InputText)
+	if err != nil {
+		err = status.Errorf(codes.Internal, err.Error())
+	}
+
+	ss := strings.Split(convText, "\n") //TODO: do smarter split
+
 	err = render.ToPNG(ss, req.FontFile, float64(req.FontSize), &buf)
 	if err != nil {
 		err = status.Errorf(codes.Internal, err.Error())
