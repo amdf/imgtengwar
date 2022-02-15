@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/amdf/imgtengwar/internal/render"
 	pb "github.com/amdf/imgtengwar/svc"
@@ -33,6 +37,8 @@ type TengwarConverterServer struct {
 
 func (srv TengwarConverterServer) ConvertText(ctx context.Context, req *pb.SimpleConvertRequest) (resp *pb.ConvertResponse, err error) {
 	resp = &pb.ConvertResponse{}
+	t := time.Now()
+	defer func() { fmt.Println("MakeImage ", time.Since(t)) }()
 	resp.ConvertedText, err = srv.conv.Convert(req.InputText)
 	if err != nil {
 		err = status.Errorf(codes.Internal, err.Error())
@@ -40,8 +46,21 @@ func (srv TengwarConverterServer) ConvertText(ctx context.Context, req *pb.Simpl
 	return
 }
 
-func (srv TengwarConverterServer) MakeImage(context.Context, *pb.ConvertRequest) (*httpbody.HttpBody, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MakeImage not implemented")
+func (srv TengwarConverterServer) MakeImage(ctx context.Context, req *pb.ConvertRequest) (body *httpbody.HttpBody, err error) {
+	var buf bytes.Buffer
+	t := time.Now()
+	defer func() { fmt.Println("2MakeImage ", req, time.Since(t)) }()
+	ss := strings.Split(req.InputText, "\r\n") //TODO: do smarter split
+	err = render.ToPNG(ss, req.FontFile, float64(req.FontSize), &buf)
+	if err != nil {
+		err = status.Errorf(codes.Internal, err.Error())
+		return
+	}
+	body = &httpbody.HttpBody{
+		ContentType: "image/png",
+		Data:        buf.Bytes(),
+	}
+	return
 }
 
 func (srv TengwarConverterServer) GetClientAddr(ctx context.Context) string {

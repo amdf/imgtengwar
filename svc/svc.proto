@@ -11,18 +11,18 @@ import "google/api/annotations.proto";
 option go_package = "github.com/amdf/imgtengwar/svc";
 
 message SimpleConvertRequest {
-    string input_text = 1;
+    string input_text = 1 [json_name="input_text"];
 }
 
 message ConvertRequest {  
-    string input_text = 1;
-    int32 font_size = 2;
-    string font_file = 3;
+    string input_text = 1 [json_name="input_text"];
+    int32 font_size = 2 [json_name="font_size"];
+    string font_file = 3 [json_name="font_file"];
     enum FontStyles {
         NORMAL = 0;
         ITALIC = 1;
     }
-    FontStyles font_style = 4;    
+    FontStyles font_style = 4 [json_name="font_style"];
 }
 
 message ConvertResponse {    
@@ -39,7 +39,8 @@ service TengwarConverter {
 
     rpc MakeImage(ConvertRequest) returns (google.api.HttpBody) {
 		option (google.api.http) = {
-			get: "/v1/makeimage"
+			post: "/v1/makeimage"
+            body: "*"
 		};
 	}
 };
