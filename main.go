@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	SVCRPCADDR  = "localhost:50051"
-	SVCHTTPADDR = "localhost:8081" //"0.0.0.0:80"
+	SVCRPCADDR  = "0.0.0.0:50051"
+	SVCHTTPADDR = "0.0.0.0:8081" //"0.0.0.0:80"
 )
 
 type TengwarConverterServer struct {
@@ -150,7 +150,7 @@ func main() {
 
 	err = s.Serve(lis)
 	if err != nil {
-		log.Fatalln("fail to server", err)
+		log.Fatalln("server failed", err)
 	}
 
 }
