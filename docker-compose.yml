@@ -1,0 +1,19 @@
+version: '3'
+services:
+  converter:
+    image: amdf/imgtengwar
+    ports:
+      - 3333:8081
+      - 50051:50051
+  swagger:
+    image: swaggerapi/swagger-ui
+    ports:
+      - 8080:8080      
+    environment:
+      - BASE_URL=/swagger
+      - SWAGGER_JSON=/swagger.json
+      # API_URL=http://localhost:3333
+    volumes:      
+      - type: bind
+        source: ./svc/svc.swagger.json
+        target: /swagger.json
