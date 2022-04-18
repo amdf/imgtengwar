@@ -26,7 +26,7 @@ import (
 
 const (
 	SVCRPCADDR  = "0.0.0.0:50051"
-	SVCHTTPADDR = "0.0.0.0:8081" //"0.0.0.0:80"
+	SVCHTTPADDR = "0.0.0.0:8081"
 )
 
 type TengwarConverterServer struct {

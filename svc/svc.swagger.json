@@ -9,6 +9,7 @@
       "name": "TengwarConverter"
     }
   ],
+  "host": "localhost:3333",
   "consumes": [
     "application/json"
   ],
