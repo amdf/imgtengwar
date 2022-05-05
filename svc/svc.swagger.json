@@ -1,14 +1,15 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "svc.proto",
-    "version": "version not set"
+    "title": "Tengwar Converter",
+    "version": "1.0"
   },
   "tags": [
     {
       "name": "TengwarConverter"
     }
   ],
+  "host": "localhost:3333",
   "consumes": [
     "application/json"
   ],

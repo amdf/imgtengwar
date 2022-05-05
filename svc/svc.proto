@@ -7,8 +7,16 @@ import "google/api/httpbody.proto";
 // import "google/protobuf/duration.proto";
 import "google/api/annotations.proto";
 // import "google/protobuf/empty.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/amdf/imgtengwar/svc";
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+    host: "localhost:3333"
+    info: {
+      title: "Tengwar Converter";
+      version: "1.0";      
+    };
+};
 
 message SimpleConvertRequest {
     string input_text = 1 [json_name="input_text"];
