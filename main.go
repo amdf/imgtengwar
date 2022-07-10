@@ -3,31 +3,31 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/amdf/imgtengwar/internal/render"
 	pb "github.com/amdf/imgtengwar/svc"
 	"github.com/amdf/rustengwar"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"golang.org/x/time/rate"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/tap"
+
+	otgrpc "github.com/opentracing-contrib/go-grpc"
+	opentracing "github.com/opentracing/opentracing-go"
+	jaeger "github.com/uber/jaeger-client-go"
+	jcfg "github.com/uber/jaeger-client-go/config"
 )
 
 const (
-	SVCRPCADDR  = "0.0.0.0:50051"
-	SVCHTTPADDR = "0.0.0.0:8081"
+	SVCRPCADDR = "0.0.0.0:50051"
 )
 
 type TengwarConverterServer struct {
@@ -48,6 +48,7 @@ func (srv TengwarConverterServer) ConvertText(ctx context.Context, req *pb.Simpl
 }
 
 func (srv TengwarConverterServer) MakeImage(ctx context.Context, req *pb.ConvertRequest) (body *httpbody.HttpBody, err error) {
+
 	var buf bytes.Buffer
 	t := time.Now()
 	defer func() { fmt.Println("MakeImage", time.Since(t)) }()
@@ -60,7 +61,13 @@ func (srv TengwarConverterServer) MakeImage(ctx context.Context, req *pb.Convert
 
 	ss := strings.Split(convText, "\n") //TODO: do smarter split
 
+	time.Sleep(50 * time.Millisecond)
+	parent := opentracing.SpanFromContext(ctx)
+	sp := opentracing.StartSpan("render", opentracing.ChildOf(parent.Context()))
+
 	err = render.ToPNG(ss, req.FontFile, float64(req.FontSize), &buf)
+	sp.Finish()
+
 	if err != nil {
 		err = status.Errorf(codes.Internal, err.Error())
 		return
@@ -95,68 +102,6 @@ func (srv TengwarConverterServer) RateLimiter(ctx context.Context, info *tap.Inf
 	return ctx, nil
 }
 
-func (srv TengwarConverterServer) RunGateway() {
-	//TODO: handle errors another way
-
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Note: Make sure the gRPC server is running properly and accessible
-	mux := runtime.NewServeMux()
-
-	conn, err := grpc.DialContext(
-		ctx,
-		SVCRPCADDR,
-		//grpc.WithInsecure(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		log.Fatalln("fail to dial rpc", err)
-	}
-	err = pb.RegisterTengwarConverterHandler(ctx, mux, conn)
-	if err != nil {
-		log.Fatalln("fail to register http", err)
-	}
-	//TODO: move this to config
-	allowedOrigins := []string{
-		"http://localhost:8080",
-		"http://127.0.0.1:8080"}
-
-	log.Println("starting http server at ", SVCHTTPADDR)
-	gatewayServer := &http.Server{
-		Addr:    SVCHTTPADDR,
-		Handler: cors(mux, allowedOrigins),
-	}
-	// Start HTTP server (and proxy calls to gRPC server endpoint)
-	if err = gatewayServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalln("fail to serve http", err)
-	}
-}
-
-func cors(h http.Handler, allowedOrigins []string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		providedOrigin := r.Header.Get("Origin")
-		matches := false
-		for _, allowedOrigin := range allowedOrigins {
-			if providedOrigin == allowedOrigin {
-				matches = true
-				break
-			}
-		}
-
-		if matches {
-			w.Header().Set("Access-Control-Allow-Origin", providedOrigin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE")
-			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization, ResponseType, grpc-metadata-log-level")
-		}
-		if r.Method == "OPTIONS" {
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
-}
-
 func MakeTengwarConverterServer() (srv *TengwarConverterServer, err error) {
 	srv = &TengwarConverterServer{}
 	srv.clientLimits = make(map[string]*rate.Limiter)
@@ -170,6 +115,26 @@ func main() {
 		log.Fatalln("fail to create render", err)
 	}
 
+	newjcfg := jcfg.Configuration{
+		Sampler: &jcfg.SamplerConfig{
+			Type:  "const",
+			Param: 1,
+		},
+		Reporter: &jcfg.ReporterConfig{
+			LogSpans:            true,
+			BufferFlushInterval: 1 * time.Second,
+		},
+	}
+	tracer, closer, jerr := newjcfg.New(
+		"imgtengwar",
+		jcfg.Logger(jaeger.StdLogger),
+	)
+	if jerr != nil {
+		log.Fatalln("fail to create tracing", jerr)
+	}
+	opentracing.SetGlobalTracer(tracer)
+	defer closer.Close()
+
 	server, err := MakeTengwarConverterServer()
 	if err != nil {
 		log.Fatalln("fail to create server", err)
@@ -182,12 +147,12 @@ func main() {
 
 	s := grpc.NewServer(
 		grpc.InTapHandle(server.RateLimiter),
+		grpc.UnaryInterceptor(
+			otgrpc.OpenTracingServerInterceptor(tracer)),
 	)
 	pb.RegisterTengwarConverterServer(s, server)
 
 	log.Println("starting server at ", lis.Addr())
-
-	go server.RunGateway()
 
 	err = s.Serve(lis)
 	if err != nil {
